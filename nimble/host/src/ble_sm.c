@@ -2098,6 +2098,14 @@ ble_sm_sec_req_rx(uint16_t conn_handle, struct os_mbuf **om,
                                               value_sec.rand_num,
                                               value_sec.authenticated);
     }
+
+    /* A procedure we initiated is already in progress and serves the
+     * request. Reporting an error would make ble_sm_process_result() remove
+     * that procedure, and its outcome would never reach the application.
+     */
+    if (res->app_status == BLE_HS_EALREADY) {
+        res->app_status = 0;
+    }
 }
 
 /*****************************************************************************
@@ -2716,7 +2724,9 @@ ble_sm_enc_initiate(uint16_t conn_handle, uint8_t key_size,
 
     ble_hs_unlock();
 
-    ble_sm_process_result(conn_handle, &res, true);
+    if (proc != NULL) {
+        ble_sm_process_result(conn_handle, &res, true);
+    }
 
     return res.app_status;
 }

@@ -1726,6 +1726,59 @@ ble_sm_test_util_us_bonding_good(int send_enc_req, uint8_t our_addr_type,
     ble_hs_test_util_conn_disconnect(2);
 }
 
+/* We start encryption with a stored bond and the peer's security request
+ * crosses our LE Start Encryption: the request must not end our procedure,
+ * whose result has to reach the application.
+ */
+void
+ble_sm_test_util_us_enc_sec_req_crossing(uint8_t enc_status)
+{
+    static const uint8_t peer_addr[6] = { 1, 2, 3, 5, 6, 7 };
+    static const uint8_t ltk[16] = {
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+        0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+    };
+    struct ble_store_value_sec value_sec;
+    struct ble_sm_sec_req sec_req;
+    int rc;
+
+    ble_sm_test_util_init();
+
+    memset(&value_sec, 0, sizeof value_sec);
+    value_sec.peer_addr.type = BLE_ADDR_PUBLIC;
+    memcpy(value_sec.peer_addr.val, peer_addr, 6);
+    value_sec.key_size = 16;
+    value_sec.ediv = 0x1234;
+    value_sec.rand_num = 0x5678;
+    memcpy(value_sec.ltk, ltk, 16);
+    value_sec.ltk_present = 1;
+    rc = ble_store_write_peer_sec(&value_sec);
+    TEST_ASSERT_FATAL(rc == 0);
+
+    ble_hs_test_util_create_conn(2, peer_addr, ble_sm_test_util_conn_cb, NULL);
+
+    ble_hs_test_util_hci_ack_set(
+        ble_hs_hci_util_opcode_join(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_START_ENCRYPT), 0);
+
+    rc = ble_gap_security_initiate(2);
+    TEST_ASSERT_FATAL(rc == 0);
+    ble_sm_test_util_verify_tx_start_enc(2, 0x5678, 0x1234, (uint8_t *)ltk);
+    TEST_ASSERT(ble_sm_num_procs() == 1);
+
+    sec_req.authreq = BLE_SM_PAIR_AUTHREQ_BOND;
+    ble_sm_test_util_rx_sec_req(2, &sec_req, 0);
+    TEST_ASSERT(ble_sm_num_procs() == 1);
+
+    ble_sm_test_util_rx_enc_change(2, enc_status, enc_status == 0);
+    TEST_ASSERT(ble_sm_num_procs() == 0);
+    TEST_ASSERT(ble_sm_test_gap_event_type == BLE_GAP_EVENT_ENC_CHANGE);
+    TEST_ASSERT(ble_sm_test_gap_status == BLE_HS_HCI_ERR(enc_status));
+    TEST_ASSERT(ble_sm_test_sec_state.encrypted == (enc_status == 0));
+
+    ble_hs_test_util_conn_disconnect(2);
+    ble_hs_test_util_assert_mbufs_freed(NULL);
+}
+
 void
 ble_sm_test_util_peer_fail_inval(int we_are_master, uint8_t *init_id_addr,
                                  uint8_t *resp_addr, struct ble_sm_pair_cmd *pair_req,

@@ -442,8 +442,8 @@ TEST_CASE_SELF(ble_sm_test_case_peer_sec_req_reject)
     ble_hs_test_util_create_conn(2, ((uint8_t[6]){ 1, 2, 3, 5, 6, 7 }),
                                  ble_sm_test_util_conn_cb, NULL);
 
-    /*** Pairing already in progress; reject security request after pairing
-     * response was received. */
+    /*** Pairing already in progress; ignore security request after pairing
+     * response was received. The pairing procedure goes on. */
 
     ble_hs_atomic_conn_set_flags(2, BLE_HS_CONN_F_MASTER, 1);
     rc = ble_sm_pair_initiate(2);
@@ -451,10 +451,19 @@ TEST_CASE_SELF(ble_sm_test_case_peer_sec_req_reject)
     ble_hs_test_util_prev_tx_queue_clear();
 
     ble_sm_test_util_rx_pair_rsp(2, &pair_rsp, 0);
-    ble_sm_test_util_rx_sec_req(2, &sec_req, BLE_HS_EALREADY);
+    ble_sm_test_util_rx_sec_req(2, &sec_req, 0);
     TEST_ASSERT(ble_hs_test_util_prev_tx_queue_sz() != 0);
+    TEST_ASSERT(ble_sm_num_procs() == 1);
 
     ble_hs_test_util_assert_mbufs_freed(NULL);
+}
+
+TEST_CASE_SELF(ble_sm_test_case_us_enc_sec_req_crossing)
+{
+    ble_sm_test_util_us_enc_sec_req_crossing(0);
+
+    /* The peer lost the bond */
+    ble_sm_test_util_us_enc_sec_req_crossing(BLE_ERR_PINKEY_MISSING);
 }
 
 /*****************************************************************************
@@ -545,5 +554,6 @@ TEST_SUITE(ble_sm_gen_test_suite)
     ble_sm_test_case_conn_broken();
     ble_sm_test_case_peer_sec_req_inval();
     ble_sm_test_case_peer_sec_req_reject();
+    ble_sm_test_case_us_enc_sec_req_crossing();
 }
 #endif
