@@ -1210,7 +1210,18 @@ ble_gatts_register_svcs(const struct ble_gatt_svc_def *svcs,
 static int
 ble_gatts_clt_cfg_size(void)
 {
-    return ble_gatts_num_cfgable_chrs * sizeof (struct ble_gatts_clt_cfg);
+    int size;
+
+    size = ble_gatts_num_cfgable_chrs * sizeof(struct ble_gatts_clt_cfg);
+
+    /* A free block holds the memory pool's free list link, which is larger
+     * than a single client configuration on 64-bit platforms.
+     */
+    if (size < (int)sizeof(struct os_memblock)) {
+        size = sizeof(struct os_memblock);
+    }
+
+    return size;
 }
 
 /**
@@ -1317,16 +1328,6 @@ ble_gatts_start(void)
         goto done;
     }
 
-    if (ble_hs_max_client_configs > 0) {
-        ble_gatts_clt_cfg_mem = malloc(
-            OS_MEMPOOL_BYTES(ble_hs_max_client_configs,
-                             sizeof (struct ble_gatts_clt_cfg)));
-        if (ble_gatts_clt_cfg_mem == NULL) {
-            rc = BLE_HS_ENOMEM;
-            goto done;
-        }
-    }
-
     if (ble_hs_max_services > 0) {
         ble_gatts_svc_entries =
             malloc(ble_hs_max_services * sizeof *ble_gatts_svc_entries);
@@ -1353,8 +1354,18 @@ ble_gatts_start(void)
         goto done;
     }
 
-    /* Initialize client-configuration memory pool. */
+    /* Initialize client-configuration memory pool. The block size depends
+     * on the number of configurable characteristics, known only now.
+     */
     num_elems = ble_hs_max_client_configs / ble_gatts_num_cfgable_chrs;
+    if (num_elems > 0) {
+        ble_gatts_clt_cfg_mem =
+            malloc(OS_MEMPOOL_BYTES(num_elems, ble_gatts_clt_cfg_size()));
+        if (ble_gatts_clt_cfg_mem == NULL) {
+            rc = BLE_HS_ENOMEM;
+            goto done;
+        }
+    }
     rc = os_mempool_init(&ble_gatts_clt_cfg_pool, num_elems,
                          ble_gatts_clt_cfg_size(), ble_gatts_clt_cfg_mem,
                          "ble_gatts_clt_cfg_pool");
