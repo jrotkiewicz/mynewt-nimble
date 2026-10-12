@@ -39,6 +39,8 @@ There are two packages:
 | `nimble/host/profiles/hogp` | The Report Host. Depends on `nimble/host` only. |
 | `nimble/host/profiles/hogp/report_map` | Optional parser for the Report Map (the HID report descriptor), which tells where each control is located in each report. Independent of the host package and of NimBLE. |
 
+`apps/blehogp` is a complete example using both.
+
 Contents:
 
 - [Using the Report Host](#using-the-report-host)

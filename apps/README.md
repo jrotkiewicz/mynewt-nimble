@@ -52,3 +52,11 @@ data is split in advertising data and response data.
 This application works in pair with peripheral. It's based on scanner
 application - the difference is, that if there was detected device with UUID
 fitting to the one predefined in central application, connection is initiated.
+
+## blehogp
+
+HID over GATT Profile (HOGP) Report Host. Connects to a BLE HID device such as
+a keyboard, a mouse or a gamepad that is in pairing mode, pairs with it and
+prints its reports and the controls that change, located with the Report Map
+of the device. Bonds are kept in flash, so the device is reconnected when it is
+switched on again.
